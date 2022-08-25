@@ -22,6 +22,7 @@ import torch_xla.distributed.parallel_loader as pl
 import torch_xla.utils.utils as xu
 import torch_xla.core.xla_model as xm
 import torch_xla.distributed.xla_multiprocessing as xmp
+from torch_xla.experimental import pjrt
 
 from fairseq import (
     checkpoint_utils, distributed_utils, options, progress_bar, tasks, utils
@@ -379,6 +380,7 @@ def main_tpu(args):
             sum(p.numel() for p in model.parameters()),
             sum(p.numel() for p in model.parameters() if p.requires_grad)))
         model = model.to(xla_device)
+        pjrt.broadcast_master_param(model)
         trainer = Trainer(args, task, model, criterion, xla_device=xla_device)
         lr = trainer.get_lr()
 
@@ -418,6 +420,7 @@ def main_tpu(args):
                 # last batches are incomplete
                 break
             log_output = trainer.train_step(samples)
+            xm.optimizer_step(trainer.optimizer)
             reset_perf_training_meters(trainer, i, ignore_index=10)
             if (not (i % args.log_steps)) or (i == last_batch_index-1):
                 step_args = trainer, progress, args, i
@@ -554,7 +557,8 @@ def main_tpu(args):
         )
         xm.master_print('Epoch {} end {}'.format(epoch_itr.epoch, now()))
         if args.metrics_debug:
-            xm.master_print(met.metrics_report())
+            xm.master_print("met.metrics_report() not implemented in PjRT.")
+            # xm.master_print(met.metrics_report())
         reset_training_meters(trainer)
 
         # VALIDATION
@@ -569,7 +573,8 @@ def main_tpu(args):
             lr = trainer.lr_step(epoch_itr.epoch, vloss)
             xm.master_print('new learning rate: {}'.format(lr))
             if args.metrics_debug:
-                xm.master_print(met.metrics_report())
+                xm.master_print("met.metrics_report() not implemented in PjRT.")
+                # xm.master_print(met.metrics_report())
         else:
             vloss = None
 
@@ -706,10 +711,10 @@ def cli_main():
         return cli_main_gpu(args)
     # From here on out we are in TPU context
     args = adjust_args_tpu(args)
-    xmp.spawn(_mp_fn, args=(args,), nprocs=args.num_cores)
+    pjrt.run_multiprocess(_mp_fn, args)
 
 
-def _mp_fn(index, args):
+def _mp_fn(args):
     torch.set_default_tensor_type('torch.FloatTensor')
     distributed_utils.suppress_output(xm.is_master_ordinal())
     main_tpu(args)
