@@ -373,7 +373,7 @@ class tensorboard_log_wrapper_xla(tensorboard_log_wrapper):
         writer = self._writer(self.writer_tag)
         test_utils.write_to_summary(
             summary_writer=writer, global_step=step, dict_to_write={},
-            write_xla_metrics=True,
+            write_xla_metrics=False,
         )
 
 
