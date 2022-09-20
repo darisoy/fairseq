@@ -483,7 +483,8 @@ class Trainer(object):
 
             # take an optimization step
 
-            self.optimizer.step()
+            # self.optimizer.step()
+            xm.optimizer_step(self.optimizer)
             self.set_num_updates(self.get_num_updates() + 1)
 
             # task specific update per step
