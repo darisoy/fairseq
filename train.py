@@ -710,7 +710,7 @@ def cli_main():
         return cli_main_gpu(args)
     # From here on out we are in TPU context
     args = adjust_args_tpu(args)
-    pjrt.run_multiprocess(_mp_fn, args)
+    pjrt._run_multiprocess(_mp_fn, args)
 
 
 def _mp_fn(args):
